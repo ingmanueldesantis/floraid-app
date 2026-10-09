@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { Upload, Camera, Sparkles, Image as ImageIcon, CheckCircle, ShieldCheck } from "lucide-react";
 import { SAMPLE_PLANTS, SamplePlantItem } from "../data/samplePlants";
+import { compressImage } from "../utils/imageCompressor";
 
 interface ImageUploaderProps {
   onAnalyze: (base64Image: string, notes?: string) => void;
@@ -45,19 +46,24 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
   };
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     if (!file.type.startsWith("image/")) {
       alert("Carica un file immagine valido (JPEG, PNG, WebP).");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setSelectedImage(event.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImage(file, 1200, 1200, 0.82);
+      setSelectedImage(compressed);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setSelectedImage(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleStartAnalysis = () => {

@@ -11,6 +11,13 @@ import { PlantAnalysisResult, SavedPlant } from "./types";
 import { SAMPLE_PLANTS, SamplePlantItem } from "./data/samplePlants";
 import { CheckCircle2, AlertCircle, X } from "lucide-react";
 import { getApiEndpoint } from "./services/apiConfig";
+import {
+  getSavedPlantsSync,
+  getSavedPlants,
+  saveSavedPlants,
+  cleanupLegacyStorage,
+} from "./services/storageService";
+import { compressImage } from "./utils/imageCompressor";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"identify" | "garden" | "explore">("identify");
@@ -25,36 +32,26 @@ export default function App() {
     message: string;
   } | null>(null);
 
-  // Saved Plants in LocalStorage with robust persistence across sessions
+  // Saved Plants with robust IndexedDB + quota-safe LocalStorage persistence
   const [savedPlants, setSavedPlants] = useState<SavedPlant[]>(() => {
-    try {
-      const stored =
-        localStorage.getItem("floraid_my_plants_collection") ||
-        localStorage.getItem("floraid_garden_plants");
-
-      if (stored !== null) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.error("Errore lettura piante da localStorage:", e);
-    }
-
-    // All'avvio non ci devono essere presenti piante salvate nella sezione Le mie piante
-    return [];
+    return getSavedPlantsSync();
   });
 
-  // Sync saved plants with localStorage on every change
+  // On mount, load from IndexedDB (asynchronous high-capacity storage)
   useEffect(() => {
-    try {
-      localStorage.setItem("floraid_my_plants_collection", JSON.stringify(savedPlants));
-      localStorage.setItem("floraid_garden_plants", JSON.stringify(savedPlants));
-      localStorage.setItem("floraid_my_plants_initialized", "true");
-    } catch (e) {
-      console.error("Errore scrittura localStorage:", e);
-    }
+    cleanupLegacyStorage();
+    getSavedPlants()
+      .then((plants) => {
+        if (plants && plants.length > 0) {
+          setSavedPlants(plants);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Sync saved plants safely across sessions
+  useEffect(() => {
+    saveSavedPlants(savedPlants).catch(() => {});
   }, [savedPlants]);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
@@ -66,19 +63,26 @@ export default function App() {
 
   // Identify photo via AI server endpoint
   const handleAnalyzeImage = async (imageBase64: string, notes?: string) => {
-    setScanningImagePreview(imageBase64);
+    let processedImage = imageBase64;
+    try {
+      processedImage = await compressImage(imageBase64, 1200, 1200, 0.82);
+    } catch {
+      processedImage = imageBase64;
+    }
+
+    setScanningImagePreview(processedImage);
     setIsScanning(true);
 
     try {
       // Determine MIME type
-      const mimeMatch = imageBase64.match(/^data:(image\/[a-zA-Z0-9+]+);base64,/);
+      const mimeMatch = processedImage.match(/^data:(image\/[a-zA-Z0-9+]+);base64,/);
       const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
 
       const res = await fetch(getApiEndpoint("/api/identify-plant"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageBase64,
+          imageBase64: processedImage,
           mimeType,
           userNotes: notes,
         }),
@@ -101,14 +105,14 @@ export default function App() {
       }
 
       // Attach analyzed photo
-      data.analyzedImage = imageBase64;
+      data.analyzedImage = processedImage;
       data.analyzedDate = new Date().toISOString();
 
       setCurrentPlant(data);
       setActiveTab("identify");
       showToast(`Pianta identificata: ${data.identification.commonName}!`, "success");
     } catch (err: any) {
-      console.error("Errore analisi:", err);
+      console.warn("Errore analisi:", err?.message || err);
       showToast(
         err.message || "Impossibile identificare la pianta in questo momento. Riprova con un'altra foto.",
         "error"
@@ -131,21 +135,37 @@ export default function App() {
   };
 
   // Save current plant to personal plants collection
-  const handleSaveToGarden = (customScheduleParams?: any) => {
+  const handleSaveToGarden = async (customScheduleParams?: any) => {
     if (!currentPlant) return;
+
+    let plantDataToSave = { ...currentPlant };
+    if (
+      plantDataToSave.analyzedImage &&
+      plantDataToSave.analyzedImage.startsWith("data:") &&
+      plantDataToSave.analyzedImage.length > 100000
+    ) {
+      try {
+        plantDataToSave.analyzedImage = await compressImage(
+          plantDataToSave.analyzedImage,
+          800,
+          800,
+          0.78
+        );
+      } catch {}
+    }
 
     // Check if already in collection
     const existingIndex = savedPlants.findIndex(
       (p) =>
         p.plantData.identification.scientificName.toLowerCase() ===
-        currentPlant.identification.scientificName.toLowerCase()
+        plantDataToSave.identification.scientificName.toLowerCase()
     );
 
     const scheduleData = customScheduleParams || {
       daysInterval:
-        currentPlant.customWateringSchedule?.recommendedBaseDays || 7,
+        plantDataToSave.customWateringSchedule?.recommendedBaseDays || 7,
       amountMl:
-        currentPlant.customWateringSchedule?.recommendedAmountMl || 350,
+        plantDataToSave.customWateringSchedule?.recommendedAmountMl || 350,
       potSize: "medium",
       potMaterial: "terracotta",
       exposure: "bright_indirect",
@@ -158,16 +178,16 @@ export default function App() {
       updated[existingIndex] = {
         ...updated[existingIndex],
         customSchedule: scheduleData,
-        plantData: currentPlant,
+        plantData: plantDataToSave,
       };
       setSavedPlants(updated);
-      showToast(`${currentPlant.identification.commonName} aggiornata in Le mie piante!`);
+      showToast(`${plantDataToSave.identification.commonName} aggiornata in Le mie piante!`);
     } else {
       // Create new saved plant
       const newSaved: SavedPlant = {
         id: "plant_" + Date.now(),
-        nickname: currentPlant.identification.commonName,
-        plantData: currentPlant,
+        nickname: plantDataToSave.identification.commonName,
+        plantData: plantDataToSave,
         addedAt: new Date().toISOString(),
         lastWatered: new Date().toISOString(),
         customSchedule: scheduleData,
@@ -180,17 +200,36 @@ export default function App() {
       };
       setSavedPlants([newSaved, ...savedPlants]);
       showToast(
-        `🎉 ${currentPlant.identification.commonName} salvata in Le mie piante!`,
+        `🎉 ${plantDataToSave.identification.commonName} salvata in Le mie piante!`,
         "success"
       );
     }
   };
 
   // Add plant directly from modal or catalog
-  const handleAddPlant = (newPlant: SavedPlant) => {
-    setSavedPlants((prev) => [newPlant, ...prev]);
+  const handleAddPlant = async (newPlant: SavedPlant) => {
+    let safePlant = { ...newPlant };
+    if (
+      safePlant.plantData?.analyzedImage &&
+      safePlant.plantData.analyzedImage.startsWith("data:") &&
+      safePlant.plantData.analyzedImage.length > 100000
+    ) {
+      try {
+        safePlant.plantData = {
+          ...safePlant.plantData,
+          analyzedImage: await compressImage(
+            safePlant.plantData.analyzedImage,
+            800,
+            800,
+            0.78
+          ),
+        };
+      } catch {}
+    }
+
+    setSavedPlants((prev) => [safePlant, ...prev]);
     showToast(
-      `🎉 ${newPlant.nickname || newPlant.plantData.identification.commonName} aggiunta a Le mie piante!`,
+      `🎉 ${safePlant.nickname || safePlant.plantData.identification.commonName} aggiunta a Le mie piante!`,
       "success"
     );
   };

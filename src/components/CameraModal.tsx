@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Camera, X, RefreshCw, AlertCircle } from "lucide-react";
+import { Camera, X, RefreshCw, AlertCircle, Image as ImageIcon, Sparkles } from "lucide-react";
+import { compressImage } from "../utils/imageCompressor";
 
 interface CameraModalProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -37,6 +39,10 @@ export const CameraModal: React.FC<CameraModalProps> = ({
     stopCamera();
 
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("L'accesso alla fotocamera non è supportato in questo browser.");
+      }
+
       const constraints: MediaStreamConstraints = {
         video: {
           facingMode: { ideal: facingMode },
@@ -51,11 +57,11 @@ export const CameraModal: React.FC<CameraModalProps> = ({
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        videoRef.current.play().catch(() => {});
       }
       setIsInitializing(false);
     } catch (err: any) {
-      console.warn("Fotocamera con facingMode fallita, riprovo con impostazioni standard:", err);
+      // Prova fallback standard senza vincoli avanzati
       try {
         const fallbackStream = await navigator.mediaDevices.getUserMedia({
           video: true,
@@ -64,13 +70,13 @@ export const CameraModal: React.FC<CameraModalProps> = ({
         streamRef.current = fallbackStream;
         if (videoRef.current) {
           videoRef.current.srcObject = fallbackStream;
-          videoRef.current.play();
+          videoRef.current.play().catch(() => {});
         }
         setIsInitializing(false);
       } catch (fallbackErr: any) {
-        console.error("Accesso fotocamera negato:", fallbackErr);
+        console.warn("Fotocamera WebRTC non disponibile o permessi non concessi:", fallbackErr?.name || fallbackErr?.message);
         setCameraError(
-          "Impossibile accedere alla fotocamera. Assicurati di aver concesso i permessi nel browser o carica una foto dalla memoria."
+          "I permessi per la fotocamera sono bloccati o non disponibili nel browser. Puoi scattare la foto direttamente tramite la fotocamera del tuo dispositivo o caricarla dalla memoria."
         );
         setIsInitializing(false);
       }
@@ -84,7 +90,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
     }
   };
 
-  const capturePhoto = () => {
+  const capturePhoto = async () => {
     if (!videoRef.current) return;
     const video = videoRef.current;
 
@@ -95,9 +101,27 @@ export const CameraModal: React.FC<CameraModalProps> = ({
 
     if (ctx) {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
       stopCamera();
-      onCapture(dataUrl);
+      try {
+        const compressed = await compressImage(dataUrl, 1200, 1200, 0.82);
+        onCapture(compressed);
+      } catch {
+        onCapture(dataUrl);
+      }
+    }
+  };
+
+  const handleNativeCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      try {
+        const file = e.target.files[0];
+        const compressed = await compressImage(file, 1200, 1200, 0.82);
+        stopCamera();
+        onCapture(compressed);
+      } catch (err) {
+        console.warn("Errore lettura file:", err);
+      }
     }
   };
 
@@ -109,6 +133,15 @@ export const CameraModal: React.FC<CameraModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleNativeCapture}
+        className="hidden"
+      />
+
       <div className="relative w-full max-w-xl bg-stone-900 rounded-2xl overflow-hidden shadow-2xl border border-stone-800 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 bg-stone-900/90 text-white border-b border-stone-800">
@@ -121,7 +154,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
               stopCamera();
               onClose();
             }}
-            className="p-1 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-colors"
+            className="p-1 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -130,15 +163,32 @@ export const CameraModal: React.FC<CameraModalProps> = ({
         {/* Viewport */}
         <div className="relative aspect-4/3 sm:aspect-16/10 bg-black flex items-center justify-center overflow-hidden">
           {cameraError ? (
-            <div className="p-6 text-center max-w-sm text-stone-300">
-              <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
-              <p className="text-sm font-medium mb-4">{cameraError}</p>
-              <button
-                onClick={startCamera}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold"
-              >
-                Riprova
-              </button>
+            <div className="p-6 text-center max-w-md text-stone-300 space-y-4">
+              <div className="w-14 h-14 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto text-amber-400 border border-amber-500/20">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <div>
+                <h4 className="text-white font-medium text-base mb-1.5">Permesso fotocamera</h4>
+                <p className="text-xs text-stone-300 leading-relaxed">{cameraError}</p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2.5 justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-lg transition-colors cursor-pointer"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>Usa Fotocamera Nativa / File</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={startCamera}
+                  className="px-4 py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Riprova nel browser
+                </button>
+              </div>
             </div>
           ) : (
             <>
@@ -183,7 +233,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
             type="button"
             onClick={toggleFacingMode}
             title="Cambia fotocamera frontale/posteriore"
-            className="p-3 text-stone-300 hover:text-white rounded-full hover:bg-stone-800 transition-colors"
+            className="p-3 text-stone-300 hover:text-white rounded-full hover:bg-stone-800 transition-colors cursor-pointer"
           >
             <RefreshCw className="w-6 h-6" />
           </button>
@@ -197,9 +247,14 @@ export const CameraModal: React.FC<CameraModalProps> = ({
             <div className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-700 transition-colors" />
           </button>
 
-          <div className="w-12 text-center text-[10px] text-stone-400">
-            Foto HD
-          </div>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title="Scegli dalla memoria del dispositivo"
+            className="p-3 text-stone-300 hover:text-white rounded-full hover:bg-stone-800 transition-colors cursor-pointer"
+          >
+            <ImageIcon className="w-6 h-6" />
+          </button>
         </div>
       </div>
     </div>

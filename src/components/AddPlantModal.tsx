@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { SavedPlant, PlantAnalysisResult } from "../types";
 import { SAMPLE_PLANTS, SamplePlantItem } from "../data/samplePlants";
+import { compressImage } from "../utils/imageCompressor";
 
 interface AddPlantModalProps {
   isOpen: boolean;
@@ -391,17 +392,22 @@ export const AddPlantModal: React.FC<AddPlantModalProps> = ({
   if (!isOpen) return null;
 
   // Handle custom file upload for manual plant
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setCustomPhotoUrl(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImage(file, 1000, 1000, 0.8);
+      setCustomPhotoUrl(compressed);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          setCustomPhotoUrl(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // 1-Click addition from sample plants or extra catalog plants
