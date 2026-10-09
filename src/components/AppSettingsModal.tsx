@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { X, Server, Smartphone, Check, RefreshCw, AlertCircle, ExternalLink, ShieldCheck } from "lucide-react";
-import { getServerUrl, setServerUrl, DEFAULT_PRODUCTION_SERVER, isNativePlatform } from "../services/apiConfig";
+import { X, Server, Smartphone, Check, RefreshCw, AlertCircle, ExternalLink, ShieldCheck, Download, FolderArchive, GitBranch } from "lucide-react";
+import { getServerUrl, setServerUrl, DEFAULT_PRODUCTION_SERVER, isNativePlatform, getApiEndpoint } from "../services/apiConfig";
 
 interface AppSettingsModalProps {
   isOpen: boolean;
@@ -153,17 +153,51 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
             </div>
           )}
 
+          {/* Direct Download ZIP for GitHub */}
+          <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200/90 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FolderArchive className="w-4 h-4 text-emerald-800" />
+                <h4 className="font-bold text-xs sm:text-sm text-emerald-950">
+                  Esportazione Rapida: Scarica Archivio ZIP
+                </h4>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-full">
+                Pronto
+              </span>
+            </div>
+            <p className="text-xs text-emerald-900 leading-relaxed">
+              Scarica il pacchetto completo con codice sorgente, cartella nativa <code>android/</code> e workflow GitHub Actions per la compilazione automatica dell'APK.
+            </p>
+            <a
+              href={getApiEndpoint("/api/download-zip")}
+              download="floraid-project.zip"
+              className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Scarica floraid-project.zip (per GitHub)
+            </a>
+          </div>
+
           {/* Guide Summary */}
-          <div className="bg-stone-50 p-4 rounded-xl border border-stone-200/80 space-y-2 text-xs text-stone-600">
+          <div className="bg-stone-50 p-4 rounded-xl border border-stone-200/80 space-y-2.5 text-xs text-stone-600">
             <h4 className="font-bold text-stone-800 flex items-center gap-1.5">
-              <span>🚀 Come scaricare l'APK da GitHub</span>
+              <GitBranch className="w-4 h-4 text-emerald-700" />
+              <span>Come caricare su GitHub & Generare l'APK</span>
             </h4>
-            <ol className="list-decimal list-inside space-y-1 pl-1 text-[11px] leading-relaxed">
-              <li>Esporta o fai il push di questo progetto nella tua repository GitHub.</li>
-              <li>La GitHub Action <strong>Build Android APK</strong> parte in automatico.</li>
-              <li>Vai nella scheda <strong>Actions</strong> di GitHub, apri l'ultima esecuzione.</li>
-              <li>Nella sezione <strong>Artifacts</strong>, scarica <strong>FloraID-Android-Debug-APK</strong>.</li>
-              <li>Installa il file <code className="bg-stone-200 px-1 rounded">FloraID-Debug.apk</code> sul tuo telefono Android.</li>
+            <ol className="list-decimal list-inside space-y-1.5 pl-1 text-[11px] leading-relaxed">
+              <li>
+                <strong>Crea un nuovo repository vuoto</strong> su GitHub (<a href="https://github.com/new" target="_blank" rel="noreferrer" className="text-emerald-700 underline font-semibold">github.com/new</a>) chiamandolo ad es. <code className="bg-stone-200 px-1 rounded">floraid-app</code>.
+              </li>
+              <li>
+                <strong>Carica i file</strong>: estrai lo ZIP e carica i file con l'opzione <em>"uploading an existing file"</em> su GitHub, oppure tramite Git push da terminale.
+              </li>
+              <li>
+                <strong>Generazione automatica APK</strong>: GitHub avvierà subito l'Action <strong>Build Android APK</strong>.
+              </li>
+              <li>
+                <strong>Download APK</strong>: nella scheda <strong>Actions</strong> di GitHub, apri l'ultima esecuzione e scarica l'artifact <strong>FloraID-Android-Debug-APK</strong>!
+              </li>
             </ol>
           </div>
         </div>

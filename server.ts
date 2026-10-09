@@ -645,6 +645,19 @@ Fornisci indicazioni scientifiche, rigorose e prive di allucinazioni:
   }
 });
 
+// Endpoint: Download complete project as ZIP for GitHub & APK build
+app.get("/api/download-zip", (_req, res) => {
+  const zipPath = path.resolve(__dirname, "floraid-project.zip");
+  res.download(zipPath, "floraid-project.zip", (err) => {
+    if (err) {
+      console.error("Errore download zip:", err);
+      if (!res.headersSent) {
+        res.status(500).send("Impossibile scaricare l'archivio ZIP.");
+      }
+    }
+  });
+});
+
 // Setup Vite middleware in dev or static files in production
 async function startServer() {
   const isProd = process.env.NODE_ENV === "production";
