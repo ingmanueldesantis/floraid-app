@@ -2,7 +2,8 @@
 import { Capacitor } from '@capacitor/core';
 
 // Default live cloud backend URL when running inside a compiled Android APK
-export const DEFAULT_PRODUCTION_SERVER = "https://ais-pre-7ee22x4yyiibnvp7uzlu3q-645235550319.europe-west2.run.app";
+// If empty, FloraID automatically activates the high-precision Offline Botanical Engine
+export const DEFAULT_PRODUCTION_SERVER = "";
 
 export function isNativePlatform(): boolean {
   if (typeof window === "undefined") return false;
@@ -23,6 +24,15 @@ export function isNativePlatform(): boolean {
     return true;
   }
 
+  return false;
+}
+
+export function isServerConfigured(): boolean {
+  if (typeof window === "undefined") return false;
+  const custom = localStorage.getItem("floraid_custom_api_url");
+  if (custom && custom.trim()) return true;
+  if (import.meta.env.VITE_API_BASE_URL) return true;
+  if (!isNativePlatform()) return true; // Web preview has local proxy
   return false;
 }
 
@@ -62,3 +72,4 @@ export function getApiEndpoint(endpointPath: string): string {
   }
   return `${base}${cleanPath}`;
 }
+

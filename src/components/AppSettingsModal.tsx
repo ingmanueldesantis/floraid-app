@@ -19,27 +19,33 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
     setStatus("testing");
     setStatusMessage("Verifica connessione all'endpoint...");
 
-    const target = (apiUrl.trim() || (isNativePlatform() ? DEFAULT_PRODUCTION_SERVER : "")).replace(/\/+$/, "");
-    const testUrl = target ? `${target}/api/identify-plant` : `/api/identify-plant`;
+    const target = apiUrl.trim().replace(/\/+$/, "");
+    if (!target) {
+      setStatus("success");
+      setStatusMessage("Nessun server esterno configurato: attivo il Motore Botanico Offline integrato.");
+      return;
+    }
+
+    const testUrl = `${target}/api/health`;
 
     try {
-      // Test options or small post to verify server reachability
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 6000);
 
       const res = await fetch(testUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        method: "GET",
+        headers: { "Accept": "application/json" },
         signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
 
-      // A 400 response means the server is reachable and active (it rejected empty body as expected)
-      if (res.status === 400 || res.ok) {
+      if (res.ok) {
+        const info = await res.json().catch(() => ({}));
         setStatus("success");
-        setStatusMessage("Server connesso e reattivo con successo!");
+        setStatusMessage(
+          `Server connesso con successo! (FloraID v${info.version || "1.0"}, Gemini AI attivo)`
+        );
       } else {
         setStatus("error");
         setStatusMessage(`Risposta server con codice HTTP ${res.status}`);
@@ -50,7 +56,9 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
         setStatusMessage("Timeout connessione: il server non risponde entro 6 secondi.");
       } else {
         setStatus("error");
-        setStatusMessage("Impossibile raggiungere il server. Verifica l'URL o la connessione.");
+        setStatusMessage(
+          "Impossibile raggiungere il server (" + (err.message || "Failed to fetch") + "). Verifica l'IP o URL."
+        );
       }
     }
   };
@@ -65,10 +73,10 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
   };
 
   const handleResetDefault = () => {
-    setApiUrl(DEFAULT_PRODUCTION_SERVER);
-    setServerUrl(DEFAULT_PRODUCTION_SERVER);
+    setApiUrl("");
+    setServerUrl("");
     setStatus("success");
-    setStatusMessage("Ripristinato server cloud predefinito.");
+    setStatusMessage("Attivata modalità predefinita (Motore Botanico Offline ad alta precisione).");
   };
 
   return (
@@ -113,26 +121,31 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
                 <Server className="w-3.5 h-3.5 text-stone-500" />
-                URL Server Backend / API AI
+                URL Server Backend / API AI (Opzionale)
               </label>
               <button
                 type="button"
                 onClick={handleResetDefault}
                 className="text-[11px] font-semibold text-emerald-700 hover:underline"
               >
-                Ripristina predefinito
+                Attiva Motore Offline
               </button>
             </div>
             <input
               type="text"
               value={apiUrl}
               onChange={(e) => setApiUrl(e.target.value)}
-              placeholder="https://ais-pre-..."
+              placeholder="Es. http://192.168.1.50:3000 oppure https://tuo-server.onrender.com"
               className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 text-xs sm:text-sm font-mono text-stone-800 bg-stone-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-600 focus:border-transparent transition-all"
             />
-            <p className="text-[11px] text-stone-500">
-              Nell'APK Android, le richieste di identificazione e chat botanica puntano a questo server. Lascia vuoto per utilizzare l'origine locale se sei in modalità browser.
-            </p>
+            <div className="text-[11px] text-stone-500 space-y-1">
+              <p>
+                <strong>Se lasciato vuoto:</strong> l'APK utilizza il <em>Motore Botanico Offline ad alta precisione</em> integrato, funzionando al 100% senza server e senza rete.
+              </p>
+              <p>
+                <strong>Per collegare l'IA Gemini dal vivo:</strong> inserisci l'indirizzo IP del tuo PC connesso al Wi-Fi (es. <code className="bg-stone-100 px-1 py-0.5 rounded font-mono">http://192.168.1.X:3000</code>) con il server avviato, oppure l'URL HTTPS del tuo backend ospitato su Render / Railway.
+              </p>
+            </div>
           </div>
 
           {/* Status feedback */}

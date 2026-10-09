@@ -12,6 +12,32 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Enable CORS for mobile apps (Capacitor Android localhost/capacitor origin) and cross-origin clients
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Health check endpoint for APK and status tests
+app.get("/api/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    app: "FloraID",
+    version: "1.0.0",
+    hasApiKey: !!process.env.GEMINI_API_KEY,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/api/ping", (_req, res) => {
+  res.json({ pong: true, timestamp: Date.now() });
+});
+
 // Generous payload size for high-res plant photos (base64)
 app.use(express.json({ limit: "30mb" }));
 

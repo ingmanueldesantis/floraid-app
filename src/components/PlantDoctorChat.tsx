@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Sparkles, AlertCircle } from "lucide-react";
 import { PlantAnalysisResult } from "../types";
 import { getApiEndpoint } from "../services/apiConfig";
+import { getOfflinePlantChatResponse } from "../services/offlineBotanicalService";
 
 interface Message {
   role: "user" | "assistant";
@@ -48,6 +49,9 @@ export const PlantDoctorChat: React.FC<PlantDoctorChatProps> = ({ plantData }) =
     setIsLoading(true);
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
       const res = await fetch(getApiEndpoint("/api/plant-chat"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -57,7 +61,10 @@ export const PlantDoctorChat: React.FC<PlantDoctorChatProps> = ({ plantData }) =
           question,
           messages: newMessages.slice(-6), // last 6 for context
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!res.ok) throw new Error("Errore API");
 
@@ -69,12 +76,17 @@ export const PlantDoctorChat: React.FC<PlantDoctorChatProps> = ({ plantData }) =
           text: data.answer || "Non sono riuscito a elaborare una risposta precisa.",
         },
       ]);
-    } catch (err) {
+    } catch (_err) {
+      // Offline botanical doctor fallback
+      const offlineReply = getOfflinePlantChatResponse(
+        plantData.identification.commonName,
+        question
+      );
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          text: "Scusami, si è verificato un errore di connessione temporaneo. Riprova tra poco.",
+          text: offlineReply,
         },
       ]);
     } finally {

@@ -140,33 +140,69 @@ export const GardenClimateAdvisor: React.FC<GardenClimateAdvisorProps> = ({
 
       setWeather(weatherObj);
 
-      // 3. Fetch tailored botanical care advice from server endpoint
-      const adviceRes = await fetch(getApiEndpoint("/api/climate-care-advice"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          locationName: locationLabel,
-          temperature: weatherObj.temperature,
-          humidity: weatherObj.humidity,
-          weatherDescription: weatherObj.weatherDescription,
-          season: weatherObj.season,
-          plants: savedPlants.map((p) => ({
-            id: p.id,
-            name: p.plantData.identification.commonName,
-            scientificName: p.plantData.identification.scientificName,
-            location: p.customSchedule?.location || "indoor",
+      // 3. Fetch tailored botanical care advice from server endpoint with fallback
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+        const adviceRes = await fetch(getApiEndpoint("/api/climate-care-advice"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            locationName: locationLabel,
+            temperature: weatherObj.temperature,
+            humidity: weatherObj.humidity,
+            weatherDescription: weatherObj.weatherDescription,
+            season: weatherObj.season,
+            plants: savedPlants.map((p) => ({
+              id: p.id,
+              name: p.plantData.identification.commonName,
+              scientificName: p.plantData.identification.scientificName,
+              location: p.customSchedule?.location || "indoor",
+            })),
+          }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (adviceRes.ok) {
+          const adviceJson = await adviceRes.json();
+          setAdvice(adviceJson);
+        } else {
+          throw new Error("Server advice non disponibile");
+        }
+      } catch (_adviceErr) {
+        // Fallback local agronomical calculation based on temperature, season and plants
+        const isWarm = weatherObj.temperature >= 22;
+        const isCold = weatherObj.temperature <= 12;
+        setAdvice({
+          climateSummary: `Condizioni attuali a ${locationLabel}: ${weatherObj.temperature}°C, umidità relativa al ${weatherObj.humidity}%. Condizioni ${weatherObj.weatherDescription.toLowerCase()}.`,
+          seasonalAdvice: isCold
+            ? "Temperature fresche: dirada le irrigazioni per tutte le piante da appartamento ed evita il contatto con vetri freddi o correnti."
+            : isWarm
+            ? "Clima caldo: aumenta la ventilazione naturale e controlla l'umidità del terriccio ogni 2-3 giorni."
+            : "Clima mite favorevole: mantieni una corretta rotazione dei vasi verso la luce ed effettua la consueta manutenzione.",
+          irrigationImpact: isWarm
+            ? "La traspirazione è sostenuta. Annaffia nelle prime ore del mattino o al calar del sole per ottimizzare l'assorbimento."
+            : "Evaporalità ridotta. Attendi che il substrato si asciughi a fondo prima di ogni nuova bagnatura per evitare marciumi radicali.",
+          activeAlerts: [
+            {
+              type: weatherObj.humidity < 40 ? "warning" : "info",
+              title: weatherObj.humidity < 40 ? "Umidità Ambientale Bassa" : "Microclima Equilibrato",
+              description: weatherObj.humidity < 40
+                ? "L'aria secca può causare punte delle foglie secche. Consigliata una nebulizzazione con acqua demineralizzata."
+                : "Livello di umidità ideale per la maggior parte delle specie ornamentali.",
+            },
+          ],
+          plantSpecificActions: savedPlants.slice(0, 4).map((p) => ({
+            plantName: p.plantData.identification.commonName,
+            recommendedAction: `Verifica l'umidità nei primi 3 cm di substrato; mantieni in posizione luminosa e al riparo da correnti d'aria.`,
           })),
-        }),
-      });
-
-      if (!adviceRes.ok) {
-        throw new Error("Errore durante l'elaborazione dei consigli agronomici.");
+        });
       }
-
-      const adviceJson = await adviceRes.json();
-      setAdvice(adviceJson);
     } catch (err: any) {
-      console.error("Errore fetch meteo/cura:", err);
+      console.warn("Errore fetch meteo:", err);
       setErrorMessage(
         err.message ||
           "Impossibile recuperare i dati meteorologici in questo momento. Seleziona una città dall'elenco."
