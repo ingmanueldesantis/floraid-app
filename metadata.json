@@ -1,0 +1,6 @@
+{
+  "name": "FloraID - Identificatore Piante & Cura Botanica",
+  "description": "Identifica piante da foto in stile PictureThis con diagnosi dello stato di salute, schede botaniche complete e programmi di irrigazione personalizzati.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

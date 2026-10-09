@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">FloraID</string>
+    <string name="title_activity_main">FloraID</string>
+    <string name="package_name">com.floraid.app</string>
+    <string name="custom_url_scheme">com.floraid.app</string>
+</resources>
