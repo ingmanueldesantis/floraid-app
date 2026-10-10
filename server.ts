@@ -101,13 +101,15 @@ Note fornite dall'utente: ${userNotes ? `"${userNotes}"` : "Nessuna nota aggiunt
 
 Rispondi rigorosamente in formato JSON conformandoti allo schema richiesto. Tutte le descrizioni devono essere in italiano naturale, chiaro, oggettivo, privo di speculazioni e scientificamente impeccabile.`;
 
+    const normalizedMime = mimeType === "image/jpg" ? "image/jpeg" : (mimeType || "image/jpeg");
+
     const response = await callGeminiWithFallback((model) => ({
       model,
       contents: {
         parts: [
           {
             inlineData: {
-              mimeType: mimeType || "image/jpeg",
+              mimeType: normalizedMime,
               data: cleanBase64,
             },
           },
@@ -447,7 +449,9 @@ REGOLE VINCOLANTI:
       },
     }));
 
-    const parsedData = JSON.parse(response.text || "{}");
+    const rawText = response.text || "{}";
+    const cleanedText = rawText.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+    const parsedData = JSON.parse(cleanedText);
     return res.json(parsedData);
   } catch (error: any) {
     console.error("Errore durante l'identificazione della pianta:", error);

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Sparkles, AlertCircle } from "lucide-react";
 import { PlantAnalysisResult } from "../types";
-import { getApiEndpoint } from "../services/apiConfig";
+import { apiFetch } from "../services/apiConfig";
 import { getOfflinePlantChatResponse } from "../services/offlineBotanicalService";
 
 interface Message {
@@ -52,7 +52,7 @@ export const PlantDoctorChat: React.FC<PlantDoctorChatProps> = ({ plantData }) =
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 45000);
 
-      const res = await fetch(getApiEndpoint("/api/plant-chat"), {
+      const res = await apiFetch("/api/plant-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -10,7 +10,7 @@ import {
   Check,
 } from "lucide-react";
 import { PlantAnalysisResult } from "../types";
-import { getApiEndpoint } from "../services/apiConfig";
+import { apiFetch } from "../services/apiConfig";
 
 interface WateringCalculatorProps {
   plantData: PlantAnalysisResult;
@@ -107,7 +107,7 @@ export const WateringCalculator: React.FC<WateringCalculatorProps> = ({
   const handleRecalculate = async () => {
     setIsCalculating(true);
     try {
-      const res = await fetch(getApiEndpoint("/api/calculate-watering"), {
+      const res = await apiFetch("/api/calculate-watering", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

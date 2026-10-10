@@ -32,7 +32,7 @@ Nel repository è presente il file di workflow:
 
 Ogni volta che fai un `push` sul ramo `main` o `master`, oppure quando premi manualmente **Run workflow** dalla scheda **Actions**:
 1. GitHub avvia un runner Ubuntu.
-2. Configura **Java JDK 21** e **Android SDK (API 34 / Build-Tools 34.0.0)**.
+2. Configura **Java JDK 21 (Temurin)** e **Android SDK (API 36 / 35 / Build-Tools 36.0.0 & 35.0.0)**.
 3. Installa le dipendenze npm ed esegue `npm run build` (compilazione Vite).
 4. Esegue `npx cap sync android` (copia degli asset web nella directory Android nativa).
 5. Esegue `./gradlew assembleDebug` all'interno della cartella `android/`.

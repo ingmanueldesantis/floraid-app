@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Navbar } from "./components/Navbar";
 import { ImageUploader } from "./components/ImageUploader";
 import { PlantAnalysisView } from "./components/PlantAnalysisView";
@@ -10,7 +10,7 @@ import { AppSettingsModal } from "./components/AppSettingsModal";
 import { PlantAnalysisResult, SavedPlant } from "./types";
 import { SAMPLE_PLANTS, SamplePlantItem } from "./data/samplePlants";
 import { CheckCircle2, AlertCircle, X } from "lucide-react";
-import { getApiEndpoint } from "./services/apiConfig";
+import { apiFetch, getApiEndpoint } from "./services/apiConfig";
 import {
   getSavedPlantsSync,
   getSavedPlants,
@@ -26,6 +26,7 @@ export default function App() {
   const [scanningImagePreview, setScanningImagePreview] = useState<string | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const [notification, setNotification] = useState<{
     type: "success" | "error";
@@ -61,11 +62,25 @@ export default function App() {
     }, 4500);
   };
 
+  const handleCancelScan = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsScanning(false);
+    showToast("Analisi botanica annullata.");
+  };
+
   // Identify photo via AI server endpoint
   const handleAnalyzeImage = async (imageBase64: string, notes?: string) => {
+    // Abort any prior in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
     let processedImage = imageBase64;
     try {
-      processedImage = await compressImage(imageBase64, 1200, 1200, 0.82);
+      processedImage = await compressImage(imageBase64, 1000, 1000, 0.75);
     } catch {
       processedImage = imageBase64;
     }
@@ -73,15 +88,16 @@ export default function App() {
     setScanningImagePreview(processedImage);
     setIsScanning(true);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const timeoutId = setTimeout(() => controller.abort(), 35000);
+
     try {
       // Determine MIME type
       const mimeMatch = processedImage.match(/^data:(image\/[a-zA-Z0-9+]+);base64,/);
       const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 75000);
-
-      const res = await fetch(getApiEndpoint("/api/identify-plant"), {
+      const res = await apiFetch("/api/identify-plant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -106,7 +122,6 @@ export default function App() {
           "L'immagine non sembra contenere una pianta o un fiore chiaramente riconoscibile. Prova a scattare una foto più ravvicinata delle foglie o del fiore.",
           "error"
         );
-        setIsScanning(false);
         return;
       }
 
@@ -118,18 +133,25 @@ export default function App() {
       setActiveTab("identify");
       showToast(`Pianta identificata: ${data.identification.commonName}!`, "success");
     } catch (err: any) {
+      // If user deliberately cancelled, do not show error toast
+      if (err.name === "AbortError" && abortControllerRef.current === null) {
+        return;
+      }
+
       console.error("Errore analisi botanica:", err);
       let errorMsg = "Impossibile identificare la pianta in questo momento. Riprova con una foto più nitida o ravvicinata.";
       if (err.name === "AbortError") {
-        errorMsg = "Il server ha impiegato troppo tempo per rispondere. Riprova con un'immagine più ravvicinata o verifica la connessione.";
+        errorMsg = "Il server ha impiegato più di 40 secondi a rispondere. Riprova con un'immagine più ravvicinata o verifica la connessione.";
       } else if (err.message && !err.message.includes("Failed to fetch")) {
         errorMsg = err.message;
       } else if (err.message?.includes("Failed to fetch")) {
-        errorMsg = "Impossibile raggiungere il server di analisi botanica. Verifica la connessione a Internet o le impostazioni del server.";
+        errorMsg = "Impossibile raggiungere il server di analisi botanica. Verifica la connessione o l'indirizzo del server nelle impostazioni.";
       }
       showToast(errorMsg, "error");
     } finally {
+      clearTimeout(timeoutId);
       setIsScanning(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -375,6 +397,8 @@ export default function App() {
                 onSelectSample={handleSelectSample}
                 onOpenCamera={() => setIsCameraOpen(true)}
                 isLoading={isScanning}
+                initialImage={scanningImagePreview}
+                onClearInitialImage={() => setScanningImagePreview(null)}
               />
             )}
           </>
@@ -423,6 +447,7 @@ export default function App() {
       <ScanningModal
         isOpen={isScanning}
         imagePreview={scanningImagePreview}
+        onCancel={handleCancelScan}
       />
 
       {/* APK & Server Configuration Modal */}

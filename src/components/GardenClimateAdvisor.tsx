@@ -17,7 +17,7 @@ import {
   Search,
 } from "lucide-react";
 import { SavedPlant } from "../types";
-import { getApiEndpoint } from "../services/apiConfig";
+import { apiFetch } from "../services/apiConfig";
 
 interface GardenClimateAdvisorProps {
   savedPlants: SavedPlant[];
@@ -145,7 +145,7 @@ export const GardenClimateAdvisor: React.FC<GardenClimateAdvisorProps> = ({
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 45000);
 
-        const adviceRes = await fetch(getApiEndpoint("/api/climate-care-advice"), {
+        const adviceRes = await apiFetch("/api/climate-care-advice", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

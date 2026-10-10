@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { Sparkles, Leaf, Check, Loader2 } from "lucide-react";
+import { Sparkles, Leaf, X } from "lucide-react";
 
 interface ScanningModalProps {
   isOpen: boolean;
   imagePreview: string | null;
+  onCancel?: () => void;
 }
 
-export const ScanningModal: React.FC<ScanningModalProps> = ({ isOpen, imagePreview }) => {
+export const ScanningModal: React.FC<ScanningModalProps> = ({ isOpen, imagePreview, onCancel }) => {
   const [stepIndex, setStepIndex] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const steps = [
     "Scansione morfologica della lamina fogliare...",
@@ -19,23 +21,44 @@ export const ScanningModal: React.FC<ScanningModalProps> = ({ isOpen, imagePrevi
   useEffect(() => {
     if (!isOpen) {
       setStepIndex(0);
+      setElapsedSeconds(0);
       return;
     }
 
-    const interval = setInterval(() => {
+    const stepInterval = setInterval(() => {
       setStepIndex((prev) => (prev < steps.length - 1 ? prev + 1 : prev));
     }, 1800);
 
-    return () => clearInterval(interval);
+    const timerInterval = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+
+    return () => {
+      clearInterval(stepInterval);
+      clearInterval(timerInterval);
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-      <div className="w-full max-w-md bg-stone-900 border border-stone-800 rounded-3xl p-6 text-white text-center shadow-2xl space-y-6">
+      <div className="relative w-full max-w-md bg-stone-900 border border-stone-800 rounded-3xl p-6 text-white text-center shadow-2xl space-y-5">
+        {/* Top Cancel / Close Button */}
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="absolute top-4 right-4 p-2 rounded-full text-stone-400 hover:text-white hover:bg-stone-800 transition-colors cursor-pointer"
+            title="Annulla analisi"
+            aria-label="Annulla analisi"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
+
         {/* Photo Container with animated laser scan */}
-        <div className="relative aspect-square max-w-[280px] mx-auto rounded-2xl overflow-hidden bg-stone-950 border-2 border-emerald-500/40 shadow-inner">
+        <div className="relative aspect-square max-w-[260px] mx-auto rounded-2xl overflow-hidden bg-stone-950 border-2 border-emerald-500/40 shadow-inner mt-2">
           {imagePreview ? (
             <img
               src={imagePreview}
@@ -56,23 +79,23 @@ export const ScanningModal: React.FC<ScanningModalProps> = ({ isOpen, imagePrevi
         </div>
 
         {/* Text and Steps */}
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-semibold">
             <Sparkles className="w-3.5 h-3.5 animate-spin text-emerald-400" />
-            <span>AI Botanica in elaborazione</span>
+            <span>AI Botanica in elaborazione ({elapsedSeconds}s)</span>
           </div>
 
           <h3 className="font-serif text-xl font-bold">
             Identificazione in corso...
           </h3>
 
-          <p className="text-sm text-stone-300 h-10 flex items-center justify-center font-medium">
+          <p className="text-sm text-stone-300 min-h-[40px] flex items-center justify-center font-medium px-4">
             {steps[stepIndex]}
           </p>
         </div>
 
         {/* Progress Step Indicator dots */}
-        <div className="flex items-center justify-center gap-2 pt-2">
+        <div className="flex items-center justify-center gap-2">
           {steps.map((_, i) => (
             <div
               key={i}
@@ -86,6 +109,19 @@ export const ScanningModal: React.FC<ScanningModalProps> = ({ isOpen, imagePrevi
             />
           ))}
         </div>
+
+        {/* Explicit Cancel Button to ensure user is never stuck */}
+        {onCancel && (
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-5 py-2 text-xs font-medium text-stone-400 hover:text-white bg-stone-800/80 hover:bg-stone-800 rounded-xl transition-colors cursor-pointer"
+            >
+              Annulla analisi
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

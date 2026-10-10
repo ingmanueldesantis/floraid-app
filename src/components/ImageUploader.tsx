@@ -1,5 +1,5 @@
-import React, { useState, useRef } from "react";
-import { Upload, Camera, Sparkles, Image as ImageIcon, CheckCircle, ShieldCheck } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Upload, Camera, Sparkles, Image as ImageIcon, CheckCircle, ShieldCheck, RefreshCw } from "lucide-react";
 import { SAMPLE_PLANTS, SamplePlantItem } from "../data/samplePlants";
 import { compressImage } from "../utils/imageCompressor";
 
@@ -8,6 +8,8 @@ interface ImageUploaderProps {
   onSelectSample: (sample: SamplePlantItem) => void;
   onOpenCamera: () => void;
   isLoading: boolean;
+  initialImage?: string | null;
+  onClearInitialImage?: () => void;
 }
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
@@ -15,11 +17,24 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   onSelectSample,
   onOpenCamera,
   isLoading,
+  initialImage,
+  onClearInitialImage,
 }) => {
   const [dragActive, setDragActive] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(initialImage || null);
   const [userNotes, setUserNotes] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (initialImage) {
+      setSelectedImage(initialImage);
+    }
+  }, [initialImage]);
+
+  const handleClear = () => {
+    setSelectedImage(null);
+    onClearInitialImage?.();
+  };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -175,7 +190,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 />
                 <button
                   type="button"
-                  onClick={() => setSelectedImage(null)}
+                  onClick={handleClear}
                   className="absolute top-3 right-3 bg-black/60 hover:bg-black text-white text-xs px-3 py-1.5 rounded-lg backdrop-blur-xs transition-colors cursor-pointer"
                 >
                   Cambia foto
@@ -206,12 +221,21 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     disabled={isLoading}
                     className="flex-1 py-3.5 px-6 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
-                    <Sparkles className="w-5 h-5" />
-                    <span>Identifica e Analizza Ora</span>
+                    {isLoading ? (
+                      <>
+                        <RefreshCw className="w-5 h-5 animate-spin" />
+                        <span>Identificazione in corso...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-5 h-5" />
+                        <span>Identifica e Analizza Ora</span>
+                      </>
+                    )}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSelectedImage(null)}
+                    onClick={handleClear}
                     disabled={isLoading}
                     className="py-3.5 px-4 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl font-medium transition-colors cursor-pointer"
                   >

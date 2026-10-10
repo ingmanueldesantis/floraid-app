@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { X, Server, Smartphone, Check, RefreshCw, AlertCircle, ExternalLink, ShieldCheck, Download, FolderArchive, GitBranch } from "lucide-react";
-import { getServerUrl, setServerUrl, DEFAULT_PRODUCTION_SERVER, isNativePlatform, getApiEndpoint } from "../services/apiConfig";
+import { X, Server, Smartphone, Check, RefreshCw, AlertCircle, ShieldCheck, Download, FolderArchive, GitBranch } from "lucide-react";
+import { getSavedServerUrl, setServerUrl, isNativePlatform, getApiEndpoint } from "../services/apiConfig";
 
 interface AppSettingsModalProps {
   isOpen: boolean;
@@ -8,8 +8,8 @@ interface AppSettingsModalProps {
 }
 
 export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onClose }) => {
-  const currentSaved = typeof window !== "undefined" ? localStorage.getItem("floraid_custom_api_url") || "" : "";
-  const [apiUrl, setApiUrl] = useState<string>(currentSaved || (isNativePlatform() ? DEFAULT_PRODUCTION_SERVER : ""));
+  const currentSaved = getSavedServerUrl();
+  const [apiUrl, setApiUrl] = useState<string>(currentSaved);
   const [status, setStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState<string>("");
 
@@ -19,14 +19,8 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
     setStatus("testing");
     setStatusMessage("Verifica connessione all'endpoint...");
 
-    const target = apiUrl.trim().replace(/\/+$/, "") || DEFAULT_PRODUCTION_SERVER;
-    if (!target) {
-      setStatus("error");
-      setStatusMessage("Nessun endpoint server specificato.");
-      return;
-    }
-
-    const testUrl = `${target}/api/health`;
+    const target = apiUrl.trim().replace(/\/+$/, "");
+    const testUrl = target ? `${target}/api/health` : "/api/health";
 
     try {
       const controller = new AbortController();
@@ -73,10 +67,10 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
   };
 
   const handleResetDefault = () => {
-    setApiUrl(DEFAULT_PRODUCTION_SERVER);
+    setApiUrl("");
     setServerUrl("");
     setStatus("success");
-    setStatusMessage("Ripristinato server cloud predefinito.");
+    setStatusMessage("Ripristinato server predefinito (connessione locale diretta).");
   };
 
   return (
@@ -89,13 +83,13 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
               <Smartphone className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-stone-900 text-base">Impostazioni APK & Connessione</h3>
+              <h3 className="font-bold text-stone-900 text-base">Impostazioni Connessione & Server</h3>
               <p className="text-xs text-stone-500">FloraID Mobile v1.0.0</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-200/50 transition-colors"
+            className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-200/50 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -111,7 +105,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
                 {isNativePlatform() ? "Applicazione Android Nativa Attiva" : "Modalità Web & GitHub Ready"}
               </p>
               <p className="text-emerald-800 leading-relaxed">
-                Il progetto è configurato per generare automaticamente il file APK tramite GitHub Actions ad ogni esportazione su GitHub.
+                Il backend elabora le foto botaniche tramite Google Gemini Vision AI per garantire il riconoscimento immediato di specie e malattie.
               </p>
             </div>
           </div>
@@ -126,7 +120,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
               <button
                 type="button"
                 onClick={handleResetDefault}
-                className="text-[11px] font-semibold text-emerald-700 hover:underline"
+                className="text-[11px] font-semibold text-emerald-700 hover:underline cursor-pointer"
               >
                 Ripristina Predefinito
               </button>
@@ -135,15 +129,15 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
               type="text"
               value={apiUrl}
               onChange={(e) => setApiUrl(e.target.value)}
-              placeholder="Es. https://tuo-server.run.app oppure http://192.168.1.50:3000"
+              placeholder="Lascia vuoto per il server predefinito oppure inserisci l'URL"
               className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 text-xs sm:text-sm font-mono text-stone-800 bg-stone-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-600 focus:border-transparent transition-all"
             />
             <div className="text-[11px] text-stone-500 space-y-1">
               <p>
-                <strong>Predefinito:</strong> L'applicazione si connette al backend cloud di FloraID alimentato da Google Gemini Vision per riconoscere oltre 400.000 specie e diagnosticare la salute delle piante.
+                <strong>Predefinito:</strong> L'applicazione si connette direttamente al server integrato di FloraID per riconoscere oltre 400.000 specie e diagnosticare la salute delle piante.
               </p>
               <p>
-                <strong>Server personalizzato:</strong> Se hai pubblicato il server su Cloud Run, Render o Railway, o lo esegui in rete locale, puoi specificare qui l'endpoint.
+                <strong>Server personalizzato:</strong> Se installi l'APK su smartphone e hai ospitato il backend su un tuo dominio pubblico (Cloud Run, Render, Railway o ngrok), inserisci qui l'indirizzo.
               </p>
             </div>
           </div>
@@ -180,7 +174,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
               </span>
             </div>
             <p className="text-xs text-emerald-900 leading-relaxed">
-              Scarica il pacchetto completo con codice sorgente, cartella nativa <code>android/</code> e workflow GitHub Actions per la compilazione automatica dell'APK.
+              Scarica il pacchetto completo con codice sorgente, icona FloraID, cartella nativa <code>android/</code> e workflow GitHub Actions per la compilazione automatica dell'APK.
             </p>
             <a
               href={getApiEndpoint("/api/download-zip")}
@@ -200,7 +194,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
             </h4>
             <ol className="list-decimal list-inside space-y-1.5 pl-1 text-[11px] leading-relaxed">
               <li>
-                <strong>Crea un nuovo repository vuoto</strong> su GitHub (<a href="https://github.com/new" target="_blank" rel="noreferrer" className="text-emerald-700 underline font-semibold">github.com/new</a>) chiamandolo ad es. <code className="bg-stone-200 px-1 rounded">floraid-app</code>.
+                <strong>Crea un nuovo repository</strong> su GitHub (<a href="https://github.com/new" target="_blank" rel="noreferrer" className="text-emerald-700 underline font-semibold">github.com/new</a>) chiamandolo ad es. <code className="bg-stone-200 px-1 rounded">floraid-app</code>.
               </li>
               <li>
                 <strong>Carica i file</strong>: estrai lo ZIP e carica i file con l'opzione <em>"uploading an existing file"</em> su GitHub, oppure tramite Git push da terminale.
@@ -221,23 +215,23 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
             type="button"
             onClick={handleTestConnection}
             disabled={status === "testing"}
-            className="px-3.5 py-2 text-xs font-semibold text-stone-700 hover:text-stone-900 hover:bg-stone-200/60 rounded-xl transition-colors flex items-center gap-1.5"
+            className="px-4 py-2 border border-stone-300 text-stone-700 text-xs sm:text-sm font-semibold rounded-xl hover:bg-stone-100 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${status === "testing" ? "animate-spin" : ""}`} />
-            Testa Server
+            <span>Test Connessione</span>
           </button>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-stone-600 hover:text-stone-900 rounded-xl transition-colors"
+              className="px-4 py-2 text-stone-500 hover:text-stone-700 text-xs sm:text-sm font-medium transition-colors cursor-pointer"
             >
               Chiudi
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="px-4 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-xl shadow-xs transition-colors"
+              className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
             >
               Salva
             </button>

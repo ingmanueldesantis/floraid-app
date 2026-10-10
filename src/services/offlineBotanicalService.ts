@@ -346,7 +346,7 @@ export async function identifyPlantOffline(
   }
 
   // 3. Assemble full result from database
-  let baseData: PlantAnalysisResult | undefined;
+  let baseData: PlantAnalysisResult = JSON.parse(JSON.stringify(SAMPLE_PLANTS[0].defaultData));
   const sample = SAMPLE_PLANTS.find((s) => s.id === matchedKey);
   if (sample) {
     baseData = JSON.parse(JSON.stringify(sample.defaultData));
