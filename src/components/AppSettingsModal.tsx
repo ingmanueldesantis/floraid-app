@@ -186,24 +186,46 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
             </a>
           </div>
 
+          {/* Backend Connection Instructions for APK */}
+          <div className="bg-stone-50 p-4 rounded-xl border border-stone-200/80 space-y-2.5 text-xs text-stone-600">
+            <h4 className="font-bold text-stone-800 flex items-center gap-1.5">
+              <Server className="w-4 h-4 text-emerald-700" />
+              <span>Come collegare l'APK al Server AI (Render / Cloud Gratuito)</span>
+            </h4>
+            <p className="text-[11px] text-stone-600 leading-relaxed">
+              Il file <code className="bg-stone-200 px-1 rounded">server.ts</code> contiene il motore di intelligenza artificiale Google Gemini Vision. Per far funzionare l'APK ovunque nel mondo:
+            </p>
+            <ol className="list-decimal list-inside space-y-1.5 pl-1 text-[11px] leading-relaxed">
+              <li>
+                Vai su <strong><a href="https://render.com" target="_blank" rel="noreferrer" className="text-emerald-700 underline font-semibold">Render.com</a></strong> (piano gratuito) e crea un <strong>New Web Service</strong> collegando il repository GitHub.
+              </li>
+              <li>
+                Il file <code className="bg-stone-200 px-1 rounded">render.yaml</code> è già incluso e configurerà tutto automaticamente!
+              </li>
+              <li>
+                Nelle impostazioni ambiente di Render, aggiungi la chiave <code className="bg-stone-200 px-1 rounded">GEMINI_API_KEY</code>.
+              </li>
+              <li>
+                Copia l'URL assegnato da Render (es. <code className="bg-stone-200 px-1 rounded">https://tuo-server.onrender.com</code>) e incollalo nel campo in alto in questa schermata, poi premi <strong>Salva</strong>.
+              </li>
+            </ol>
+          </div>
+
           {/* Guide Summary */}
           <div className="bg-stone-50 p-4 rounded-xl border border-stone-200/80 space-y-2.5 text-xs text-stone-600">
             <h4 className="font-bold text-stone-800 flex items-center gap-1.5">
               <GitBranch className="w-4 h-4 text-emerald-700" />
-              <span>Come caricare su GitHub & Generare l'APK</span>
+              <span>Come scaricare l'APK aggiornato da GitHub</span>
             </h4>
             <ol className="list-decimal list-inside space-y-1.5 pl-1 text-[11px] leading-relaxed">
               <li>
-                <strong>Crea un nuovo repository</strong> su GitHub (<a href="https://github.com/new" target="_blank" rel="noreferrer" className="text-emerald-700 underline font-semibold">github.com/new</a>) chiamandolo ad es. <code className="bg-stone-200 px-1 rounded">floraid-app</code>.
+                Il repository GitHub <code className="bg-stone-200 px-1 rounded">ingmanueldesantis/floraid-app</code> viene sincronizzato automaticamente.
               </li>
               <li>
-                <strong>Carica i file</strong>: estrai lo ZIP e carica i file con l'opzione <em>"uploading an existing file"</em> su GitHub, oppure tramite Git push da terminale.
+                GitHub avvia l'Action <strong>Build Android APK</strong> ad ogni commit.
               </li>
               <li>
-                <strong>Generazione automatica APK</strong>: GitHub avvierà subito l'Action <strong>Build Android APK</strong>.
-              </li>
-              <li>
-                <strong>Download APK</strong>: nella scheda <strong>Actions</strong> di GitHub, apri l'ultima esecuzione e scarica l'artifact <strong>FloraID-Android-Debug-APK</strong>!
+                Nella scheda <strong>Actions</strong> di GitHub, apri l'ultima esecuzione e scarica il file <strong>FloraID-Android-Debug-APK</strong>!
               </li>
             </ol>
           </div>

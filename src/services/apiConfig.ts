@@ -46,8 +46,8 @@ export function getSavedServerUrl(): string {
     const saved = localStorage.getItem("floraid_custom_api_url");
     if (saved) {
       const trimmed = saved.trim().replace(/\/+$/, "");
-      // Purge any deprecated or obsolete cloud run domain
-      if (trimmed.includes("ais-pre-") || trimmed.includes("ais-dev-") || trimmed.includes("run.app")) {
+      // Purge any deprecated or obsolete AI Studio internal dev containers
+      if (trimmed.includes("ais-pre-") || trimmed.includes("ais-dev-")) {
         localStorage.removeItem("floraid_custom_api_url");
         return "";
       }

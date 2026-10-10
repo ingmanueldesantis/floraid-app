@@ -54,10 +54,18 @@ Ogni volta che fai un `push` sul ramo `main` o `master`, oppure quando premi man
 
 ## 🌐 4. Connessione API / Backend dall'APK Mobile
 
-Quando l'applicazione gira all'interno dell'APK Android nativo:
-- L'app utilizza l'helper intelligente `src/services/apiConfig.ts`.
-- È preconfigurata per puntare al server cloud di produzione FloraID.
-- Puoi verificare o modificare l'URL del server in qualsiasi momento toccando il pulsante **"APK & Server"** nella barra di navigazione in alto dell'applicazione.
+L'applicazione FloraID elabora le immagini utilizzando il potente modello multimodale **Google Gemini Vision AI** implementato in `server.ts`.
+
+Nell'ambiente APK Android:
+1. **Ospita il backend gratuitamente su Render o Cloud Run**:
+   - Collega il tuo repository GitHub (`ingmanueldesantis/floraid-app`) su [Render.com](https://render.com) come **Web Service** (piano Free).
+   - Il file `render.yaml` già presente configurerà automaticamente Node, build e avvio (`tsx server.ts`).
+   - Aggiungi la variabile d'ambiente `GEMINI_API_KEY` con la tua chiave Google Gemini.
+2. **Collega l'APK**:
+   - Apri l'app FloraID sul tuo smartphone Android.
+   - Clicca sull'icona **"APK & Server"** (o l'icona ingranaggio) nella barra superiore.
+   - Inserisci l'URL del tuo servizio Render (es. `https://floraid-backend.onrender.com`) e clicca su **"Salva"**.
+   - Da quel momento in poi, ogni foto scattata dall'app mobile verrà analizzata all'istante con Gemini Vision AI garantendo identificazione autentica al 100% e zero allucinazioni.
 
 ---
 

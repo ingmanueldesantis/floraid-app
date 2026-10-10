@@ -18,7 +18,6 @@ import {
   cleanupLegacyStorage,
 } from "./services/storageService";
 import { compressImage } from "./utils/imageCompressor";
-import { identifyPlantOffline } from "./services/offlineBotanicalService";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"identify" | "garden" | "explore">("identify");
@@ -32,6 +31,10 @@ export default function App() {
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
+    action?: {
+      label: string;
+      onClick: () => void;
+    };
   } | null>(null);
 
   // Saved Plants with robust IndexedDB + quota-safe LocalStorage persistence
@@ -56,11 +59,15 @@ export default function App() {
     saveSavedPlants(savedPlants).catch(() => {});
   }, [savedPlants]);
 
-  const showToast = (message: string, type: "success" | "error" = "success") => {
-    setNotification({ message, type });
+  const showToast = (
+    message: string,
+    type: "success" | "error" = "success",
+    action?: { label: string; onClick: () => void }
+  ) => {
+    setNotification({ message, type, action });
     setTimeout(() => {
-      setNotification(null);
-    }, 4500);
+      setNotification((curr) => (curr?.message === message ? null : curr));
+    }, 6000);
   };
 
   const handleCancelScan = () => {
@@ -72,7 +79,7 @@ export default function App() {
     showToast("Analisi botanica annullata.");
   };
 
-  // Identify photo via AI server endpoint or offline botanical engine
+  // Identify photo via authentic Gemini AI server endpoint
   const handleAnalyzeImage = async (imageBase64: string, notes?: string) => {
     // Abort any prior in-flight request
     if (abortControllerRef.current) {
@@ -89,30 +96,23 @@ export default function App() {
     setScanningImagePreview(processedImage);
     setIsScanning(true);
 
-    // If running in native Android APK without an external server URL configured,
-    // seamlessly use the high-precision Offline Botanical Engine directly for instant recognition
+    // If running in native Android APK without an external server URL configured:
     if (isNativePlatform() && !isServerConfigured()) {
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 1400));
-        const offlineData = await identifyPlantOffline(processedImage, notes);
-        setCurrentPlant(offlineData);
-        setActiveTab("identify");
-        showToast(
-          `Pianta identificata: ${offlineData.identification.commonName}! (Motore Botanico Locale offline)`,
-          "success"
-        );
-      } catch (err: any) {
-        showToast("Impossibile analizzare l'immagine. Riprova con una foto più nitida o ravvicinata.", "error");
-      } finally {
-        setIsScanning(false);
-        abortControllerRef.current = null;
-      }
+      setIsScanning(false);
+      showToast(
+        "Per analizzare le piante con Gemini Vision AI dall'APK Android, connetti l'app al tuo server FloraID (es. ospitato gratuitamente su Render o Cloud Run).",
+        "error",
+        {
+          label: "Configura Server",
+          onClick: () => setIsSettingsOpen(true),
+        }
+      );
       return;
     }
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    const timeoutId = setTimeout(() => controller.abort(), 28000);
+    const timeoutId = setTimeout(() => controller.abort(), 35000);
 
     try {
       // Determine MIME type
@@ -153,39 +153,42 @@ export default function App() {
 
       setCurrentPlant(data);
       setActiveTab("identify");
-      showToast(`Pianta identificata: ${data.identification.commonName}!`, "success");
+      showToast(`Pianta identificata con successo: ${data.identification.commonName}!`, "success");
     } catch (err: any) {
-      // If user deliberately cancelled, do not show error toast or fallback
+      // If user deliberately cancelled, do not show error
       if (err.name === "AbortError" && abortControllerRef.current === null) {
         return;
       }
 
-      console.warn("Chiamata server non riuscita, attivazione motore botanico locale di riserva:", err?.message || err);
-
-      // Graceful fallback: If network failed or server is unreachable or timed out,
-      // use the Offline Botanical Engine seamlessly so the user is NEVER blocked!
-      try {
-        const offlineData = await identifyPlantOffline(processedImage, notes);
-        if (offlineData) {
-          setCurrentPlant(offlineData);
-          setActiveTab("identify");
-          showToast(
-            `Pianta identificata: ${offlineData.identification.commonName}! (Analisi completata con Motore Botanico Locale offline)`,
-            "success"
-          );
-          return;
-        }
-      } catch (offlineErr) {
-        console.error("Errore anche durante l'analisi offline:", offlineErr);
-      }
+      console.error("[FloraID] Errore analisi immagine:", err);
 
       let errorMsg = "Impossibile identificare la pianta in questo momento. Riprova con una foto più nitida o ravvicinata.";
+      let action: { label: string; onClick: () => void } | undefined = undefined;
+
       if (err.name === "AbortError") {
-        errorMsg = "Tempo di risposta scaduto. Riprova con un'immagine più ravvicinata o verifica la connessione.";
-      } else if (err.message && !err.message.includes("Failed to fetch")) {
+        errorMsg = "Tempo di risposta scaduto. Il server botanico impiega troppo tempo a rispondere o la connessione è lenta.";
+        action = {
+          label: "Verifica Server",
+          onClick: () => setIsSettingsOpen(true),
+        };
+      } else if (
+        err.message &&
+        (err.message.includes("Failed to fetch") ||
+          err.message.includes("NetworkError") ||
+          err.message.includes("Load failed") ||
+          err.message.includes("Impossibile raggiungere"))
+      ) {
+        errorMsg =
+          "Impossibile raggiungere il server botanico FloraID. Verifica la connessione a internet o l'indirizzo del server nelle impostazioni.";
+        action = {
+          label: "Impostazioni Server",
+          onClick: () => setIsSettingsOpen(true),
+        };
+      } else if (err.message) {
         errorMsg = err.message;
       }
-      showToast(errorMsg, "error");
+
+      showToast(errorMsg, "error", action);
     } finally {
       clearTimeout(timeoutId);
       setIsScanning(false);
@@ -388,8 +391,20 @@ export default function App() {
           ) : (
             <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
           )}
-          <div className="flex-1 text-xs sm:text-sm font-medium">
-            {notification.message}
+          <div className="flex-1 text-xs sm:text-sm font-medium space-y-2">
+            <p className="leading-snug">{notification.message}</p>
+            {notification.action && (
+              <button
+                type="button"
+                onClick={() => {
+                  notification.action?.onClick();
+                  setNotification(null);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-stone-900 hover:bg-stone-100 text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer"
+              >
+                <span>{notification.action.label}</span>
+              </button>
+            )}
           </div>
           <button
             onClick={() => setNotification(null)}
