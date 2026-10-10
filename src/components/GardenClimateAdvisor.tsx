@@ -143,7 +143,7 @@ export const GardenClimateAdvisor: React.FC<GardenClimateAdvisorProps> = ({
       // 3. Fetch tailored botanical care advice from server endpoint with fallback
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const timeoutId = setTimeout(() => controller.abort(), 45000);
 
         const adviceRes = await fetch(getApiEndpoint("/api/climate-care-advice"), {
           method: "POST",

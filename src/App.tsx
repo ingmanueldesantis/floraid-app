@@ -10,7 +10,7 @@ import { AppSettingsModal } from "./components/AppSettingsModal";
 import { PlantAnalysisResult, SavedPlant } from "./types";
 import { SAMPLE_PLANTS, SamplePlantItem } from "./data/samplePlants";
 import { CheckCircle2, AlertCircle, X } from "lucide-react";
-import { getApiEndpoint, isNativePlatform, isServerConfigured } from "./services/apiConfig";
+import { getApiEndpoint } from "./services/apiConfig";
 import {
   getSavedPlantsSync,
   getSavedPlants,
@@ -18,7 +18,6 @@ import {
   cleanupLegacyStorage,
 } from "./services/storageService";
 import { compressImage } from "./utils/imageCompressor";
-import { identifyPlantOffline } from "./services/offlineBotanicalService";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"identify" | "garden" | "explore">("identify");
@@ -62,7 +61,7 @@ export default function App() {
     }, 4500);
   };
 
-  // Identify photo via AI server endpoint or offline botanical engine
+  // Identify photo via AI server endpoint
   const handleAnalyzeImage = async (imageBase64: string, notes?: string) => {
     let processedImage = imageBase64;
     try {
@@ -74,32 +73,13 @@ export default function App() {
     setScanningImagePreview(processedImage);
     setIsScanning(true);
 
-    // If running in native Android APK without an external server URL configured,
-    // use the high-precision Offline Botanical Engine directly for instant recognition
-    if (isNativePlatform() && !isServerConfigured()) {
-      try {
-        const offlineData = await identifyPlantOffline(processedImage, notes);
-        setCurrentPlant(offlineData);
-        setActiveTab("identify");
-        showToast(
-          `Pianta identificata: ${offlineData.identification.commonName}! (Motore Botanico Offline)`,
-          "success"
-        );
-      } catch (err: any) {
-        showToast("Impossibile analizzare l'immagine. Riprova con un'altra foto.", "error");
-      } finally {
-        setIsScanning(false);
-      }
-      return;
-    }
-
     try {
       // Determine MIME type
       const mimeMatch = processedImage.match(/^data:(image\/[a-zA-Z0-9+]+);base64,/);
       const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutId = setTimeout(() => controller.abort(), 75000);
 
       const res = await fetch(getApiEndpoint("/api/identify-plant"), {
         method: "POST",
@@ -121,7 +101,7 @@ export default function App() {
 
       const data: PlantAnalysisResult = await res.json();
 
-      if (!data.isPlant && (!data.identification?.commonName || data.identification.commonName.toLowerCase().includes("sconosciut"))) {
+      if (!data.isPlant && (!data.identification?.commonName || data.identification.commonName.toLowerCase().includes("sconosciut") || data.identification.commonName.toLowerCase().includes("non identificab"))) {
         showToast(
           "L'immagine non sembra contenere una pianta o un fiore chiaramente riconoscibile. Prova a scattare una foto più ravvicinata delle foglie o del fiore.",
           "error"
@@ -138,22 +118,16 @@ export default function App() {
       setActiveTab("identify");
       showToast(`Pianta identificata: ${data.identification.commonName}!`, "success");
     } catch (err: any) {
-      console.warn("Errore analisi server, attivazione motore botanico offline:", err?.message || err);
-      // Graceful fallback: If network failed or server is unreachable, use Offline Botanical Engine seamlessly!
-      try {
-        const offlineData = await identifyPlantOffline(processedImage, notes);
-        setCurrentPlant(offlineData);
-        setActiveTab("identify");
-        showToast(
-          `Pianta identificata: ${offlineData.identification.commonName}! (Motore Botanico Offline)`,
-          "success"
-        );
-      } catch {
-        showToast(
-          "Impossibile identificare la pianta in questo momento. Riprova con un'altra foto.",
-          "error"
-        );
+      console.error("Errore analisi botanica:", err);
+      let errorMsg = "Impossibile identificare la pianta in questo momento. Riprova con una foto più nitida o ravvicinata.";
+      if (err.name === "AbortError") {
+        errorMsg = "Il server ha impiegato troppo tempo per rispondere. Riprova con un'immagine più ravvicinata o verifica la connessione.";
+      } else if (err.message && !err.message.includes("Failed to fetch")) {
+        errorMsg = err.message;
+      } else if (err.message?.includes("Failed to fetch")) {
+        errorMsg = "Impossibile raggiungere il server di analisi botanica. Verifica la connessione a Internet o le impostazioni del server.";
       }
+      showToast(errorMsg, "error");
     } finally {
       setIsScanning(false);
     }

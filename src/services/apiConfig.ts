@@ -2,8 +2,7 @@
 import { Capacitor } from '@capacitor/core';
 
 // Default live cloud backend URL when running inside a compiled Android APK
-// If empty, FloraID automatically activates the high-precision Offline Botanical Engine
-export const DEFAULT_PRODUCTION_SERVER = "";
+export const DEFAULT_PRODUCTION_SERVER = "https://ais-pre-7ee22x4yyiibnvp7uzlu3q-645235550319.europe-west2.run.app";
 
 export function isNativePlatform(): boolean {
   if (typeof window === "undefined") return false;
@@ -15,12 +14,8 @@ export function isNativePlatform(): boolean {
   const origin = window.location.origin;
   if (
     origin.startsWith("capacitor://") ||
-    origin.startsWith("http://localhost") ||
-    origin.startsWith("https://localhost") ||
     window.location.protocol === "file:"
   ) {
-    // If running on port 3000 (vite dev server), it's web dev
-    if (window.location.port === "3000") return false;
     return true;
   }
 

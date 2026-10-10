@@ -19,10 +19,10 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
     setStatus("testing");
     setStatusMessage("Verifica connessione all'endpoint...");
 
-    const target = apiUrl.trim().replace(/\/+$/, "");
+    const target = apiUrl.trim().replace(/\/+$/, "") || DEFAULT_PRODUCTION_SERVER;
     if (!target) {
-      setStatus("success");
-      setStatusMessage("Nessun server esterno configurato: attivo il Motore Botanico Offline integrato.");
+      setStatus("error");
+      setStatusMessage("Nessun endpoint server specificato.");
       return;
     }
 
@@ -30,7 +30,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       const res = await fetch(testUrl, {
         method: "GET",
@@ -44,7 +44,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
         const info = await res.json().catch(() => ({}));
         setStatus("success");
         setStatusMessage(
-          `Server connesso con successo! (FloraID v${info.version || "1.0"}, Gemini AI attivo)`
+          `Server connesso con successo! (FloraID v${info.version || "1.0"}, Gemini Vision AI attivo)`
         );
       } else {
         setStatus("error");
@@ -53,11 +53,11 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
     } catch (err: any) {
       if (err.name === "AbortError") {
         setStatus("error");
-        setStatusMessage("Timeout connessione: il server non risponde entro 6 secondi.");
+        setStatusMessage("Timeout connessione: il server non risponde entro 10 secondi.");
       } else {
         setStatus("error");
         setStatusMessage(
-          "Impossibile raggiungere il server (" + (err.message || "Failed to fetch") + "). Verifica l'IP o URL."
+          "Impossibile raggiungere il server (" + (err.message || "Failed to fetch") + "). Verifica la connessione o l'URL."
         );
       }
     }
@@ -73,10 +73,10 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
   };
 
   const handleResetDefault = () => {
-    setApiUrl("");
+    setApiUrl(DEFAULT_PRODUCTION_SERVER);
     setServerUrl("");
     setStatus("success");
-    setStatusMessage("Attivata modalità predefinita (Motore Botanico Offline ad alta precisione).");
+    setStatusMessage("Ripristinato server cloud predefinito.");
   };
 
   return (
@@ -121,29 +121,29 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({ isOpen, onCl
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
                 <Server className="w-3.5 h-3.5 text-stone-500" />
-                URL Server Backend / API AI (Opzionale)
+                URL Server Backend / API AI Gemini
               </label>
               <button
                 type="button"
                 onClick={handleResetDefault}
                 className="text-[11px] font-semibold text-emerald-700 hover:underline"
               >
-                Attiva Motore Offline
+                Ripristina Predefinito
               </button>
             </div>
             <input
               type="text"
               value={apiUrl}
               onChange={(e) => setApiUrl(e.target.value)}
-              placeholder="Es. http://192.168.1.50:3000 oppure https://tuo-server.onrender.com"
+              placeholder="Es. https://tuo-server.run.app oppure http://192.168.1.50:3000"
               className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 text-xs sm:text-sm font-mono text-stone-800 bg-stone-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-600 focus:border-transparent transition-all"
             />
             <div className="text-[11px] text-stone-500 space-y-1">
               <p>
-                <strong>Se lasciato vuoto:</strong> l'APK utilizza il <em>Motore Botanico Offline ad alta precisione</em> integrato, funzionando al 100% senza server e senza rete.
+                <strong>Predefinito:</strong> L'applicazione si connette al backend cloud di FloraID alimentato da Google Gemini Vision per riconoscere oltre 400.000 specie e diagnosticare la salute delle piante.
               </p>
               <p>
-                <strong>Per collegare l'IA Gemini dal vivo:</strong> inserisci l'indirizzo IP del tuo PC connesso al Wi-Fi (es. <code className="bg-stone-100 px-1 py-0.5 rounded font-mono">http://192.168.1.X:3000</code>) con il server avviato, oppure l'URL HTTPS del tuo backend ospitato su Render / Railway.
+                <strong>Server personalizzato:</strong> Se hai pubblicato il server su Cloud Run, Render o Railway, o lo esegui in rete locale, puoi specificare qui l'endpoint.
               </p>
             </div>
           </div>

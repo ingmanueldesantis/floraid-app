@@ -50,7 +50,7 @@ export const PlantDoctorChat: React.FC<PlantDoctorChatProps> = ({ plantData }) =
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
 
       const res = await fetch(getApiEndpoint("/api/plant-chat"), {
         method: "POST",
