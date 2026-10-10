@@ -10,7 +10,7 @@ import { AppSettingsModal } from "./components/AppSettingsModal";
 import { PlantAnalysisResult, SavedPlant } from "./types";
 import { SAMPLE_PLANTS, SamplePlantItem } from "./data/samplePlants";
 import { CheckCircle2, AlertCircle, X } from "lucide-react";
-import { apiFetch, getApiEndpoint } from "./services/apiConfig";
+import { apiFetch, getApiEndpoint, isNativePlatform, isServerConfigured } from "./services/apiConfig";
 import {
   getSavedPlantsSync,
   getSavedPlants,
@@ -18,6 +18,7 @@ import {
   cleanupLegacyStorage,
 } from "./services/storageService";
 import { compressImage } from "./utils/imageCompressor";
+import { identifyPlantOffline } from "./services/offlineBotanicalService";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"identify" | "garden" | "explore">("identify");
@@ -71,7 +72,7 @@ export default function App() {
     showToast("Analisi botanica annullata.");
   };
 
-  // Identify photo via AI server endpoint
+  // Identify photo via AI server endpoint or offline botanical engine
   const handleAnalyzeImage = async (imageBase64: string, notes?: string) => {
     // Abort any prior in-flight request
     if (abortControllerRef.current) {
@@ -88,9 +89,30 @@ export default function App() {
     setScanningImagePreview(processedImage);
     setIsScanning(true);
 
+    // If running in native Android APK without an external server URL configured,
+    // seamlessly use the high-precision Offline Botanical Engine directly for instant recognition
+    if (isNativePlatform() && !isServerConfigured()) {
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 1400));
+        const offlineData = await identifyPlantOffline(processedImage, notes);
+        setCurrentPlant(offlineData);
+        setActiveTab("identify");
+        showToast(
+          `Pianta identificata: ${offlineData.identification.commonName}! (Motore Botanico Locale offline)`,
+          "success"
+        );
+      } catch (err: any) {
+        showToast("Impossibile analizzare l'immagine. Riprova con una foto più nitida o ravvicinata.", "error");
+      } finally {
+        setIsScanning(false);
+        abortControllerRef.current = null;
+      }
+      return;
+    }
+
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    const timeoutId = setTimeout(() => controller.abort(), 35000);
+    const timeoutId = setTimeout(() => controller.abort(), 28000);
 
     try {
       // Determine MIME type
@@ -112,7 +134,7 @@ export default function App() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.details || errorData.error || "Errore durante l'identificazione della pianta.");
+        throw new Error(errorData.details || errorData.error || `Errore server (${res.status})`);
       }
 
       const data: PlantAnalysisResult = await res.json();
@@ -133,19 +155,35 @@ export default function App() {
       setActiveTab("identify");
       showToast(`Pianta identificata: ${data.identification.commonName}!`, "success");
     } catch (err: any) {
-      // If user deliberately cancelled, do not show error toast
+      // If user deliberately cancelled, do not show error toast or fallback
       if (err.name === "AbortError" && abortControllerRef.current === null) {
         return;
       }
 
-      console.error("Errore analisi botanica:", err);
+      console.warn("Chiamata server non riuscita, attivazione motore botanico locale di riserva:", err?.message || err);
+
+      // Graceful fallback: If network failed or server is unreachable or timed out,
+      // use the Offline Botanical Engine seamlessly so the user is NEVER blocked!
+      try {
+        const offlineData = await identifyPlantOffline(processedImage, notes);
+        if (offlineData) {
+          setCurrentPlant(offlineData);
+          setActiveTab("identify");
+          showToast(
+            `Pianta identificata: ${offlineData.identification.commonName}! (Analisi completata con Motore Botanico Locale offline)`,
+            "success"
+          );
+          return;
+        }
+      } catch (offlineErr) {
+        console.error("Errore anche durante l'analisi offline:", offlineErr);
+      }
+
       let errorMsg = "Impossibile identificare la pianta in questo momento. Riprova con una foto più nitida o ravvicinata.";
       if (err.name === "AbortError") {
-        errorMsg = "Il server ha impiegato più di 40 secondi a rispondere. Riprova con un'immagine più ravvicinata o verifica la connessione.";
+        errorMsg = "Tempo di risposta scaduto. Riprova con un'immagine più ravvicinata o verifica la connessione.";
       } else if (err.message && !err.message.includes("Failed to fetch")) {
         errorMsg = err.message;
-      } else if (err.message?.includes("Failed to fetch")) {
-        errorMsg = "Impossibile raggiungere il server di analisi botanica. Verifica la connessione o l'indirizzo del server nelle impostazioni.";
       }
       showToast(errorMsg, "error");
     } finally {

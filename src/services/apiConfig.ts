@@ -5,13 +5,25 @@ export function isNativePlatform(): boolean {
   if (typeof window === "undefined") return false;
 
   // Real native capacitor platform check
-  if (Capacitor.isNativePlatform()) return true;
+  try {
+    if (Capacitor.isNativePlatform()) return true;
+    const platform = Capacitor.getPlatform();
+    if (platform === "android" || platform === "ios") return true;
+  } catch {
+    // ignore
+  }
 
-  // Mobile Webview or capacitor asset scheme
+  // Mobile Webview, custom schemes or Android webview localhost
   const origin = window.location.origin || "";
+  const hostname = window.location.hostname || "";
+  const port = window.location.port || "";
+
   if (
     origin.startsWith("capacitor://") ||
-    origin.startsWith("file:")
+    origin.startsWith("file:") ||
+    (hostname === "localhost" && port !== "3000" && port !== "5173") ||
+    typeof (window as any).Android !== "undefined" ||
+    (typeof (window as any).Capacitor !== "undefined" && (window as any).Capacitor?.isNative)
   ) {
     return true;
   }
